@@ -10,11 +10,22 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 export default function LoginScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const prefillEmail = route.params?.emailPrefill || '';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  React.useEffect(() => {
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+    }
+  }, [prefillEmail]);
 
   const handleLogin = () => {
     if (!email || !password) {
@@ -94,7 +105,10 @@ export default function LoginScreen() {
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity style={styles.signupButton}>
+            <TouchableOpacity
+              style={styles.signupButton}
+              onPress={() => navigation.navigate('SignUp')}
+            >
               <Text style={styles.signupText}>
                 Don't have an account? <Text style={styles.signupLink}>Sign Up</Text>
               </Text>
