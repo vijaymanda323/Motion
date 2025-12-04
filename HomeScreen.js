@@ -1,11 +1,80 @@
 // --- Start of HomeScreen.js ---
 
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRoute } from "@react-navigation/native";
+import API_BASE_URL from "./config/api";
 
 export default function HomeScreen({ navigation }) {
-  return (
+  const route = useRoute();
+  const userNameFromParams = route.params?.userName;
+  const userEmailFromParams = route.params?.userEmail;
+  
+  // Helper function to safely convert to string
+  const safeString = (value, fallback = '') => {
+    if (value == null) return fallback;
+    const str = String(value).trim();
+    return str || fallback;
+  };
+  
+  // Helper function to safely convert to number
+  const safeNumber = (value, fallback = 0) => {
+    if (value == null) return fallback;
+    const num = Number(value);
+    return isNaN(num) ? fallback : Math.max(0, num);
+  };
+  
+  const [userName, setUserName] = useState(() => safeString(userNameFromParams, 'User'));
+  const [userEmail, setUserEmail] = useState(() => safeString(userEmailFromParams, 'admin'));
+  const [streakCount, setStreakCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    // If we have email from params, use it; otherwise try to get from stored user data
+    const email = safeString(userEmailFromParams, 'admin'); // Fallback to 'admin' for now
+    setUserEmail(email);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/profile/${email}`);
+      
+      if (!response.ok) {
+        console.warn('Failed to fetch user profile:', response.status);
+        setLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.user) {
+        const firstName = data.user.firstName || data.user.name || userNameFromParams || 'User';
+        const streak = data.user.streakCount || 0;
+        const userEmailValue = data.user.email || email;
+        
+        // Ensure all values are strings/numbers, never undefined or null
+        setUserName(safeString(firstName, 'User'));
+        setStreakCount(safeNumber(streak, 0));
+        setUserEmail(safeString(userEmailValue, safeString(email, 'admin')));
+      } else {
+        // If no user data, keep defaults
+        setUserName(safeString(userNameFromParams, 'User'));
+        setStreakCount(0);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      // Keep default values if fetch fails
+      setUserName(safeString(userNameFromParams, 'User'));
+      setStreakCount(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
     <SafeAreaView style={styles.container}>
       {/* TOP HEADER */}
       <View style={styles.header}>
@@ -14,36 +83,42 @@ export default function HomeScreen({ navigation }) {
             <Ionicons name="arrow-back" size={26} color="#fff" />
           </TouchableOpacity>
 
-          {/* 🎯 Profile Icon: Navigate to AboutYou */}
-          <TouchableOpacity onPress={() => navigation.navigate("AboutYou")}>
-            <Ionicons name="person-circle-outline" size={30} color="#fff" />
-          </TouchableOpacity>
+          {/* 🎯 Profile Icon: Navigate to AboutYou */}
+          <TouchableOpacity onPress={() => navigation.navigate("AboutYou", { userEmail: userEmail })}>
+            <Ionicons name="person-circle-outline" size={30} color="#fff" />
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.headerTitle}>Hi, Neha</Text>
-        <Text style={styles.headerSubtitle}>Let's fix that posture.</Text>
+        <Text style={styles.headerTitle}>Hi, {safeString(userName, 'User')}</Text>
+        <Text style={styles.headerSubtitle}>Let's fix that posture.</Text>
 
-        {/* Status & Streak */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>STATUS</Text>
-            <View style={styles.statValueRow}>
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.statValue}> Active</Text>
-            </View>
-          </View>
+        {/* Status & Streak */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>STATUS</Text>
+            <View style={styles.statValueRow}>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.statValue}> Active</Text>
+            </View>
+          </View>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>STREAK</Text>
-            <Text style={styles.statValue}>🔥 3 Day</Text>
-          </View>
-        </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>STREAK</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.statValue}>
+                🔥 {safeNumber(streakCount, 0)} {safeNumber(streakCount, 0) === 1 ? 'Day' : 'Days'}
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
 
       {/* CONTENT */}
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Pain Bingo - clickable card */}
-        <TouchableOpacity onPress={() => navigation.navigate("PainBingo")}>
+        {/* Pain Bingo - clickable card */}
+        <TouchableOpacity onPress={() => navigation.navigate("PainBingo", { userEmail: userEmail })}>
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <Ionicons name="apps-outline" size={22} color="#777" />
@@ -85,16 +160,16 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.navTextActive}>Today</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("PainBingo")}>
-            <Ionicons name="apps-outline" size={24} color="#888" />
-            <Text style={styles.navText}>Bingo</Text>
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("PainBingo", { userEmail: userEmail })}>
+            <Ionicons name="apps-outline" size={24} color="#888" />
+            <Text style={styles.navText}>Bingo</Text>
+          </TouchableOpacity>
           
-          {/* 🎯 Profile Tab: Navigate to AboutYou */}
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("AboutYou")}>
-            <Ionicons name="person-outline" size={24} color="#888" />
-            <Text style={styles.navText}>Profile</Text>
-          </TouchableOpacity>
+          {/* 🎯 Profile Tab: Navigate to AboutYou */}
+          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("AboutYou", { userEmail: userEmail })}>
+            <Ionicons name="person-outline" size={24} color="#888" />
+            <Text style={styles.navText}>Profile</Text>
+          </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

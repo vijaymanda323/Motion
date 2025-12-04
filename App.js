@@ -12,7 +12,8 @@ import HomeScreen from './HomeScreen';
 // New imports
 import PainBingoScreen from './PainBingoScreen'; 
 import QuickReliefScreen from './QuickReliefScreen'; 
-import AboutYouScreen from './AboutYouScreen'; 
+import AboutYouScreen from './AboutYouScreen';
+import PainAreaScreen from './PainArea'; 
 
 const Stack = createNativeStackNavigator();
 
@@ -37,7 +38,8 @@ export default function App() {
         {/* Route for the Quick Relief Screen */}
         <Stack.Screen name="QuickRelief" component={QuickReliefScreen} /> 
         
-        <Stack.Screen name="AboutYou" component={AboutYouScreen} /> 
+        <Stack.Screen name="AboutYou" component={AboutYouScreen} />
+        <Stack.Screen name="PainArea" component={PainAreaScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

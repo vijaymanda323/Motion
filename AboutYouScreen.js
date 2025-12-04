@@ -1,21 +1,11 @@
-// --- Start of AboutYouScreen.js ---
 
-import React from 'react';
-import { View, Text, SafeAreaView, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-
-// Placeholder data (you would load this from state/API in a real app)
-const profileData = {
-    height: '172 cm',
-    weight: '54 kg',
-    birthday: 'May 6, 1992',
-    sex: 'Female',
-    displayName: 'Neha ',
-    location: 'Choose country',
-    bio: 'Share your fitness goals',
-    accountCreated: 'December 2, 2025',
-    id: 'CWJZJV',
-};
+import { useRoute } from '@react-navigation/native';
+import API_BASE_URL from './config/api';
 
 // 🌟 CORRECTED COMPONENT: Now displays both label and value
 const ProfileRow = ({ label, value }) => (
@@ -27,8 +17,76 @@ const ProfileRow = ({ label, value }) => (
 );
 
 export default function AboutYouScreen({ navigation }) {
+    const route = useRoute();
+    const userEmailFromParams = route.params?.userEmail;
+    
+    const [profileData, setProfileData] = useState({
+        height: '',
+        weight: '',
+        birthday: '',
+        sex: '',
+        displayName: '',
+        location: 'Choose country',
+        bio: 'Share your fitness goals',
+        accountCreated: '',
+        id: '',
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchUserProfile();
+    }, []);
+
+    const fetchUserProfile = async () => {
+        // Try to get email from params or use default
+        const email = userEmailFromParams || 'admin'; // Fallback to 'admin' for now
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/users/profile/${email}`);
+            const data = await response.json();
+            
+            if (response.ok && data.user) {
+                const user = data.user;
+                
+                // Format birth date
+                let birthdayFormatted = '';
+                if (user.birthDate) {
+                    const birthDate = new Date(user.birthDate);
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                                   'July', 'August', 'September', 'October', 'November', 'December'];
+                    birthdayFormatted = `${months[birthDate.getMonth()]} ${birthDate.getDate()}, ${birthDate.getFullYear()}`;
+                }
+                
+                // Format account created date
+                let accountCreatedFormatted = '';
+                if (user.createdAt) {
+                    const createdDate = new Date(user.createdAt);
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                                   'July', 'August', 'September', 'October', 'November', 'December'];
+                    accountCreatedFormatted = `${months[createdDate.getMonth()]} ${createdDate.getDate()}, ${createdDate.getFullYear()}`;
+                }
+                
+                setProfileData({
+                    height: user.height ? `${user.height} cm` : '',
+                    weight: user.weight ? `${user.weight} kg` : '',
+                    birthday: birthdayFormatted,
+                    sex: user.gender || '',
+                    displayName: user.firstName || user.name || '',
+                    location: 'Choose country',
+                    bio: 'Share your fitness goals',
+                    accountCreated: accountCreatedFormatted,
+                    id: user.id || user._id?.toString().substring(0, 6).toUpperCase() || '',
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Feather name="arrow-left" size={24} color="#333" />
@@ -36,7 +94,12 @@ export default function AboutYouScreen({ navigation }) {
                 <Text style={styles.headerTitle}>About you</Text>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#0A84FF" />
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* Profile Information Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Profile information</Text>
@@ -109,7 +172,8 @@ export default function AboutYouScreen({ navigation }) {
                     <ProfileRow label="ID" value={profileData.id} />
                 </View>
                 
-            </ScrollView>
+                </ScrollView>
+            )}
         </SafeAreaView>
     );
 }
@@ -205,6 +269,11 @@ const styles = StyleSheet.create({
         color: '#0A84FF',
         fontWeight: '600',
         fontSize: 14,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 

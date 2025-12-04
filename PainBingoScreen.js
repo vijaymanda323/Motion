@@ -1,9 +1,11 @@
 // --- Start of PainBingoScreen.js ---
 
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native'; 
+import { useNavigation, useRoute } from '@react-navigation/native';
+import API_BASE_URL from './config/api'; 
 
 // --- STYLE DEFINITION (MOVED UP FOR CLEAN SCOPE) ---
 const styles = StyleSheet.create({
@@ -19,13 +21,16 @@ const styles = StyleSheet.create({
     paddingBottom: 120, // Space for bottom navigation
   },
   
-  // --- Header ---
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
+  // --- Header ---
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingTop: 10,
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
   title: {
     fontSize: 34,
     fontWeight: '900',
@@ -201,12 +206,57 @@ const BINGO_TILES = [
 ];
 
 const PainBingoScreen = () => {
-  const navigation = useNavigation();
-  
-  // State to manage selected tiles, pre-filled with the tiles shown as selected in the reference images
-  const [selectedTiles, setSelectedTiles] = useState([
-    'Slouching posture', 'Fatigue', 'Tight shoulders'
-  ]);
+  const navigation = useNavigation();
+  const route = useRoute();
+  const userEmailFromParams = route.params?.userEmail;
+  
+  // Helper function to safely convert to number
+  const safeNumber = (value, fallback = 0) => {
+    if (value == null) return fallback;
+    const num = Number(value);
+    return isNaN(num) ? fallback : Math.max(0, num);
+  };
+  
+  // State to manage selected tiles, pre-filled with the tiles shown as selected in the reference images
+  const [selectedTiles, setSelectedTiles] = useState([
+    'Slouching posture', 'Fatigue', 'Tight shoulders'
+  ]);
+  
+  // State for streak count
+  const [streakCount, setStreakCount] = useState(0);
+  const [loadingStreak, setLoadingStreak] = useState(true);
+  
+  useEffect(() => {
+    fetchUserStreak();
+  }, []);
+  
+  const fetchUserStreak = async () => {
+    const email = userEmailFromParams || 'admin';
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/profile/${email}`);
+      
+      if (!response.ok) {
+        console.warn('Failed to fetch user profile:', response.status);
+        setLoadingStreak(false);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.user) {
+        const streak = data.user.streakCount || 0;
+        setStreakCount(safeNumber(streak, 0));
+      } else {
+        setStreakCount(0);
+      }
+    } catch (error) {
+      console.error('Error fetching user streak:', error);
+      setStreakCount(0);
+    } finally {
+      setLoadingStreak(false);
+    }
+  };
 
   const handleTileSelection = (tile) => {
     // Prevent selection of the FREE SPACE tile
@@ -247,19 +297,24 @@ const PainBingoScreen = () => {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* --- Top Header and Title --- */}
-        <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Ionicons name="arrow-back" size={28} color="#fff" />
-            </TouchableOpacity>
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* --- Top Header and Title --- */}
+      <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={28} color="#fff" />
+          </TouchableOpacity>
 
-            <View style={styles.rewardIndicator}>
-                <Text style={styles.rewardText}>🔥 3</Text>
-            </View>
-        </View>
+          <View style={styles.rewardIndicator}>
+              {loadingStreak ? (
+                <ActivityIndicator color="#ffaa00" size="small" />
+              ) : (
+                <Text style={styles.rewardText}>🔥 {streakCount}</Text>
+              )}
+          </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         {/* Title and Subtitle */}
         <Text style={styles.title}>PAIN BINGO</Text>
@@ -297,23 +352,33 @@ const PainBingoScreen = () => {
         </View>
       </ScrollView>
 
-      {/* --- Bottom Navigation --- */}
-      <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem}>
-            <Ionicons name="today-outline" size={24} color="#888" />
-            <Text style={styles.navText}>Today</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItemActive}>
-            <Ionicons name="apps" size={24} color="#e0b0ff" />
-            <Text style={styles.navTextActive}>Bingo</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItem}>
-            <Ionicons name="person-outline" size={24} color="#888" />
-            <Text style={styles.navText}>Profile</Text>
-          </TouchableOpacity>
-      </View>
+      {/* --- Bottom Navigation --- */}
+      <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => navigation.navigate('HomeScreen', { 
+              userEmail: userEmailFromParams || 'admin' 
+            })}
+          >
+            <Ionicons name="today-outline" size={24} color="#888" />
+            <Text style={styles.navText}>Today</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.navItemActive}>
+            <Ionicons name="apps" size={24} color="#e0b0ff" />
+            <Text style={styles.navTextActive}>Bingo</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => navigation.navigate('AboutYou', { 
+              userEmail: userEmailFromParams || 'admin' 
+            })}
+          >
+            <Ionicons name="person-outline" size={24} color="#888" />
+            <Text style={styles.navText}>Profile</Text>
+          </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };

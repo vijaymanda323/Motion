@@ -5,17 +5,19 @@ import {
     View,
     TextInput,
     TouchableOpacity,
-    SafeAreaView,
     KeyboardAvoidingView,
     Platform,
     Alert,
     ScrollView,
     Modal,
     FlatList,
+    ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute } from '@react-navigation/native';
 import Feather from 'react-native-vector-icons/Feather';
+import API_BASE_URL from './config/api';
 
 export default function ProfileSetup({ navigation }) {
     const route = useRoute();
@@ -43,6 +45,9 @@ export default function ProfileSetup({ navigation }) {
     // Date Picker states
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dateObject, setDateObject] = useState(new Date());
+    
+    // Loading state
+    const [loading, setLoading] = useState(false);
 
     const sexOptions = ['Male', 'Female', 'Other'];
 
@@ -79,7 +84,7 @@ export default function ProfileSetup({ navigation }) {
     };
 
     // 🎯 MODIFIED: Navigation logic added here
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!firstName || !surname || !sex || !birthDate || !height || !weight) {
             Alert.alert('Error', 'Please fill in all required personal and metric fields');
             return;
@@ -102,30 +107,163 @@ export default function ProfileSetup({ navigation }) {
             return;
         }
 
-        // Navigate to the Home Screen and pass the user's name
-        navigation.navigate('HomeScreen', { userName: firstName });
+        // Get user email from route params
+        const userEmail = user?.email;
+        if (!userEmail) {
+            Alert.alert('Error', 'User email not found. Please login again.');
+            return;
+        }
 
-        // Optional: Logging data
-        console.log('Profile data submitted:', {
-            firstName,
-            surname,
-            sex,
-            birthDate,
-            height,
-            weight,
-            bmi: calculateBMI(),
-            heartSurgery,
-            withinSixMonths,
-            heartSurgeryComment,
-            fractures,
-            withinSixMonthsFracture,
-            fracturesComment,
-        });
+        setLoading(true);
+        try {
+            // Convert birthDate from DD-MM-YYYY to Date object
+            let birthDateObj;
+            try {
+                const [day, month, year] = birthDate.split('-');
+                if (!day || !month || !year) {
+                    throw new Error('Invalid birth date format');
+                }
+                birthDateObj = new Date(year, month - 1, day);
+                
+                // Validate the date
+                if (isNaN(birthDateObj.getTime())) {
+                    throw new Error('Invalid date');
+                }
+            } catch (dateError) {
+                console.error('Date parsing error:', dateError);
+                Alert.alert('Error', 'Invalid birth date format. Please use DD-MM-YYYY format.');
+                setLoading(false);
+                return;
+            }
+
+            // Log API call details for debugging
+            console.log('Saving profile to:', `${API_BASE_URL}/users/profile`);
+            console.log('User email:', userEmail);
+            console.log('Platform:', Platform.OS);
+
+            // Save profile data to database
+            const profileData = {
+                email: userEmail,
+                firstName: firstName || '',
+                surname: surname || '',
+                sex: sex || '',
+                birthDate: birthDateObj ? birthDateObj.toISOString() : null,
+                height: height || '',
+                weight: weight || '',
+                heartSurgery: heartSurgery !== null ? heartSurgery : false,
+                withinSixMonths: withinSixMonths !== null ? withinSixMonths : false,
+                heartSurgeryComment: heartSurgeryComment || '',
+                fractures: fractures !== null ? fractures : false,
+                withinSixMonthsFracture: withinSixMonthsFracture !== null ? withinSixMonthsFracture : false,
+                fracturesComment: fracturesComment || '',
+            };
+
+            console.log('Profile data to save:', JSON.stringify(profileData, null, 2));
+
+            const response = await fetch(`${API_BASE_URL}/users/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(profileData),
+            }).catch((fetchError) => {
+                console.error('Fetch error:', fetchError);
+                throw new Error(`Network error: ${fetchError.message}`);
+            });
+
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                let errorText = '';
+                try {
+                    errorText = await response.text();
+                } catch (textError) {
+                    console.error('Error reading response text:', textError);
+                    errorText = `Server error: ${response.status}`;
+                }
+                
+                console.error('Error response:', errorText);
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch (e) {
+                    errorData = { message: errorText || `Unknown error (Status: ${response.status})` };
+                }
+                throw new Error(errorData.message || `Server error: ${response.status}`);
+            }
+
+            let data;
+            try {
+                const responseText = await response.text();
+                if (responseText) {
+                    data = JSON.parse(responseText);
+                } else {
+                    data = { message: 'Profile updated successfully' };
+                }
+            } catch (parseError) {
+                console.error('Error parsing response:', parseError);
+                data = { message: 'Profile updated successfully' };
+            }
+            
+            console.log('Profile saved successfully:', data);
+
+            // Navigate to Pain Area Screen after profile setup
+            navigation.navigate('PainArea', { 
+                userName: firstName,
+                userEmail: userEmail
+            });
+        } catch (error) {
+            console.error('Profile save error:', error);
+            console.error('Error type:', typeof error);
+            console.error('Error details:', {
+                message: error?.message || 'Unknown error',
+                stack: error?.stack || 'No stack trace',
+                name: error?.name || 'Unknown',
+                API_URL: `${API_BASE_URL}/users/profile`,
+                User_Email: userEmail
+            });
+            
+            let errorMessage = '';
+            let errorTitle = 'Error';
+            
+            const errorMsg = error?.message || error?.toString() || 'Unknown error';
+            
+            if (errorMsg.includes('Network request failed') || 
+                errorMsg.includes('Failed to fetch') || 
+                errorMsg.includes('Network error') ||
+                errorMsg.includes('fetch')) {
+                errorTitle = 'Connection Error';
+                errorMessage = 'Network error. Please check:\n\n';
+                errorMessage += '1. Backend server is running (cd backend && npm start)\n';
+                errorMessage += `2. API URL: ${API_BASE_URL}\n`;
+                errorMessage += '3. If using physical device, update API URL with your computer\'s IP address in config/api.js\n';
+                errorMessage += '4. Both devices are on the same network\n';
+                errorMessage += '5. Firewall is not blocking the connection';
+            } else if (errorMsg.includes('User not found')) {
+                errorTitle = 'User Not Found';
+                errorMessage = 'User account not found. Please register first or check your email.';
+            } else if (errorMsg.includes('Database connection') || errorMsg.includes('MongoDB')) {
+                errorTitle = 'Database Error';
+                errorMessage = 'Database connection not available. Please check MongoDB Atlas IP whitelist settings.';
+            } else if (errorMsg.includes('Invalid birth date') || errorMsg.includes('Invalid date')) {
+                errorTitle = 'Invalid Date';
+                errorMessage = 'Please enter a valid birth date in DD-MM-YYYY format.';
+            } else {
+                errorMessage = errorMsg || 'An unexpected error occurred. Please try again.';
+            }
+            
+            // Use setTimeout to ensure Alert is shown after state updates
+            setTimeout(() => {
+                Alert.alert(errorTitle, errorMessage);
+            }, 100);
+        } finally {
+            setLoading(false);
+        }
     };
     // 🎯 END MODIFIED
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
@@ -468,8 +606,16 @@ export default function ProfileSetup({ navigation }) {
                     </View>
 
                     {/* Submit Button */}
-                    <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                        <Text style={styles.submitButtonText}>Submit & Start</Text>
+                    <TouchableOpacity 
+                        style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+                        onPress={handleSubmit}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.submitButtonText}>Submit & Start</Text>
+                        )}
                     </TouchableOpacity>
                 </ScrollView>
 
@@ -832,6 +978,9 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    submitButtonDisabled: {
+        opacity: 0.6,
     },
 
     // Modal Styles

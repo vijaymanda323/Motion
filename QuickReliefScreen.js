@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native'; 
 
@@ -36,14 +37,15 @@ const QuickReliefScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* --- Top Header (Back button) --- */}
+      <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={28} color="#fff" />
+          </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* --- Top Header (Back button) --- */}
-        <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Ionicons name="arrow-back" size={28} color="#fff" />
-            </TouchableOpacity>
-        </View>
 
         {/* --- Title and Subtitle --- */}
         <Text style={styles.screenTitle}>Quick Relief</Text>
@@ -76,7 +78,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 30,
+    paddingTop: 10,
+    paddingBottom: 10,
+    marginBottom: 10,
   },
   screenTitle: {
     fontSize: 34,
