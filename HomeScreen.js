@@ -35,8 +35,15 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const fetchUserProfile = async () => {
-    // If we have email from params, use it; otherwise try to get from stored user data
-    const email = safeString(userEmailFromParams, 'admin'); // Fallback to 'admin' for now
+    // Get email from params (passed from ProfileSetup or Login)
+    const email = safeString(userEmailFromParams, '');
+    
+    if (!email) {
+      console.warn('No email provided, cannot fetch profile');
+      setLoading(false);
+      return;
+    }
+    
     setUserEmail(email);
     
     try {

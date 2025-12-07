@@ -5,6 +5,7 @@ import {
     View,
     TextInput,
     TouchableOpacity,
+    SafeAreaView,
     KeyboardAvoidingView,
     Platform,
     Alert,
@@ -13,7 +14,6 @@ import {
     FlatList,
     ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute } from '@react-navigation/native';
 import Feather from 'react-native-vector-icons/Feather';
@@ -22,6 +22,7 @@ import API_BASE_URL from './config/api';
 export default function ProfileSetup({ navigation }) {
     const route = useRoute();
     const user = route.params?.user;
+    const userEmail = user?.email || '';
 
     const [firstName, setFirstName] = useState('');
     const [surname, setSurname] = useState('');
@@ -29,6 +30,7 @@ export default function ProfileSetup({ navigation }) {
     const [birthDate, setBirthDate] = useState('');
     const [height, setHeight] = useState('');
     const [weight, setWeight] = useState('');
+    const [loading, setLoading] = useState(false);
 
     // Heart Surgery States
     const [heartSurgery, setHeartSurgery] = useState(null);
@@ -45,20 +47,21 @@ export default function ProfileSetup({ navigation }) {
     // Date Picker states
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dateObject, setDateObject] = useState(new Date());
-    
-    // Loading state
-    const [loading, setLoading] = useState(false);
 
     const sexOptions = ['Male', 'Female', 'Other'];
 
     const calculateBMI = () => {
-        if (height && weight) {
-            const heightInMeters = parseFloat(height) / 100;
-            const weightInKg = parseFloat(weight);
-            if (heightInMeters > 0 && weightInKg > 0) {
-                const bmi = (weightInKg / (heightInMeters * heightInMeters)).toFixed(1);
-                return bmi;
+        try {
+            if (height && weight) {
+                const heightInMeters = parseFloat(height) / 100;
+                const weightInKg = parseFloat(weight);
+                if (heightInMeters > 0 && weightInKg > 0) {
+                    const bmi = (weightInKg / (heightInMeters * heightInMeters)).toFixed(1);
+                    return String(bmi || '--');
+                }
             }
+        } catch (error) {
+            console.error('Error calculating BMI:', error);
         }
         return '--';
     };
@@ -83,7 +86,7 @@ export default function ProfileSetup({ navigation }) {
         }
     };
 
-    // 🎯 MODIFIED: Navigation logic added here
+    // 🎯 MODIFIED: Save profile data to backend and navigate
     const handleSubmit = async () => {
         if (!firstName || !surname || !sex || !birthDate || !height || !weight) {
             Alert.alert('Error', 'Please fill in all required personal and metric fields');
@@ -107,155 +110,66 @@ export default function ProfileSetup({ navigation }) {
             return;
         }
 
-        // Get user email from route params
-        const userEmail = user?.email;
         if (!userEmail) {
             Alert.alert('Error', 'User email not found. Please login again.');
             return;
         }
 
         setLoading(true);
+
         try {
-            // Convert birthDate from DD-MM-YYYY to Date object
-            let birthDateObj;
-            try {
-                const [day, month, year] = birthDate.split('-');
-                if (!day || !month || !year) {
-                    throw new Error('Invalid birth date format');
-                }
-                birthDateObj = new Date(year, month - 1, day);
-                
-                // Validate the date
-                if (isNaN(birthDateObj.getTime())) {
-                    throw new Error('Invalid date');
-                }
-            } catch (dateError) {
-                console.error('Date parsing error:', dateError);
-                Alert.alert('Error', 'Invalid birth date format. Please use DD-MM-YYYY format.');
-                setLoading(false);
-                return;
-            }
-
-            // Log API call details for debugging
-            console.log('Saving profile to:', `${API_BASE_URL}/users/profile`);
-            console.log('User email:', userEmail);
-            console.log('Platform:', Platform.OS);
-
-            // Save profile data to database
+            // Prepare profile data
             const profileData = {
-                email: userEmail,
-                firstName: firstName || '',
-                surname: surname || '',
-                sex: sex || '',
-                birthDate: birthDateObj ? birthDateObj.toISOString() : null,
-                height: height || '',
-                weight: weight || '',
-                heartSurgery: heartSurgery !== null ? heartSurgery : false,
-                withinSixMonths: withinSixMonths !== null ? withinSixMonths : false,
-                heartSurgeryComment: heartSurgeryComment || '',
-                fractures: fractures !== null ? fractures : false,
-                withinSixMonthsFracture: withinSixMonthsFracture !== null ? withinSixMonthsFracture : false,
-                fracturesComment: fracturesComment || '',
+                email: userEmail.trim().toLowerCase(),
+                firstName: firstName.trim(),
+                surname: surname.trim(),
+                sex: sex,
+                birthDate: birthDate,
+                height: parseFloat(height) || 0,
+                weight: parseFloat(weight) || 0,
+                heartSurgery: heartSurgery,
+                withinSixMonths: withinSixMonths,
+                heartSurgeryComment: heartSurgeryComment.trim() || '',
+                fractures: fractures,
+                withinSixMonthsFracture: withinSixMonthsFracture,
+                fracturesComment: fracturesComment.trim() || '',
             };
 
-            console.log('Profile data to save:', JSON.stringify(profileData, null, 2));
+            console.log('Saving profile data:', profileData);
 
+            // Save to backend
             const response = await fetch(`${API_BASE_URL}/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(profileData),
-            }).catch((fetchError) => {
-                console.error('Fetch error:', fetchError);
-                throw new Error(`Network error: ${fetchError.message}`);
             });
 
-            console.log('Response status:', response.status);
-            
             if (!response.ok) {
-                let errorText = '';
+                const errorText = await response.text();
+                let errorMessage = 'Failed to save profile';
                 try {
-                    errorText = await response.text();
-                } catch (textError) {
-                    console.error('Error reading response text:', textError);
-                    errorText = `Server error: ${response.status}`;
-                }
-                
-                console.error('Error response:', errorText);
-                let errorData;
-                try {
-                    errorData = JSON.parse(errorText);
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.message || errorMessage;
                 } catch (e) {
-                    errorData = { message: errorText || `Unknown error (Status: ${response.status})` };
+                    errorMessage = errorText || `Server error: ${response.status}`;
                 }
-                throw new Error(errorData.message || `Server error: ${response.status}`);
+                throw new Error(errorMessage);
             }
 
-            let data;
-            try {
-                const responseText = await response.text();
-                if (responseText) {
-                    data = JSON.parse(responseText);
-                } else {
-                    data = { message: 'Profile updated successfully' };
-                }
-            } catch (parseError) {
-                console.error('Error parsing response:', parseError);
-                data = { message: 'Profile updated successfully' };
-            }
-            
+            const data = await response.json();
             console.log('Profile saved successfully:', data);
 
-            // Navigate to Pain Area Screen after profile setup
-            navigation.navigate('PainArea', { 
+            // Navigate to HomeScreen with user data
+            navigation.navigate('HomeScreen', {
                 userName: firstName,
-                userEmail: userEmail
+                userEmail: userEmail,
             });
+
         } catch (error) {
-            console.error('Profile save error:', error);
-            console.error('Error type:', typeof error);
-            console.error('Error details:', {
-                message: error?.message || 'Unknown error',
-                stack: error?.stack || 'No stack trace',
-                name: error?.name || 'Unknown',
-                API_URL: `${API_BASE_URL}/users/profile`,
-                User_Email: userEmail
-            });
-            
-            let errorMessage = '';
-            let errorTitle = 'Error';
-            
-            const errorMsg = error?.message || error?.toString() || 'Unknown error';
-            
-            if (errorMsg.includes('Network request failed') || 
-                errorMsg.includes('Failed to fetch') || 
-                errorMsg.includes('Network error') ||
-                errorMsg.includes('fetch')) {
-                errorTitle = 'Connection Error';
-                errorMessage = 'Network error. Please check:\n\n';
-                errorMessage += '1. Backend server is running (cd backend && npm start)\n';
-                errorMessage += `2. API URL: ${API_BASE_URL}\n`;
-                errorMessage += '3. If using physical device, update API URL with your computer\'s IP address in config/api.js\n';
-                errorMessage += '4. Both devices are on the same network\n';
-                errorMessage += '5. Firewall is not blocking the connection';
-            } else if (errorMsg.includes('User not found')) {
-                errorTitle = 'User Not Found';
-                errorMessage = 'User account not found. Please register first or check your email.';
-            } else if (errorMsg.includes('Database connection') || errorMsg.includes('MongoDB')) {
-                errorTitle = 'Database Error';
-                errorMessage = 'Database connection not available. Please check MongoDB Atlas IP whitelist settings.';
-            } else if (errorMsg.includes('Invalid birth date') || errorMsg.includes('Invalid date')) {
-                errorTitle = 'Invalid Date';
-                errorMessage = 'Please enter a valid birth date in DD-MM-YYYY format.';
-            } else {
-                errorMessage = errorMsg || 'An unexpected error occurred. Please try again.';
-            }
-            
-            // Use setTimeout to ensure Alert is shown after state updates
-            setTimeout(() => {
-                Alert.alert(errorTitle, errorMessage);
-            }, 100);
+            console.error('Error saving profile:', error);
+            Alert.alert('Error', error.message || 'Failed to save profile. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -263,7 +177,7 @@ export default function ProfileSetup({ navigation }) {
     // 🎯 END MODIFIED
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
@@ -315,7 +229,7 @@ export default function ProfileSetup({ navigation }) {
                                     onPress={() => setShowSexModal(true)}
                                 >
                                     <Text style={[styles.dropdownText, !sex && styles.placeholderText]}>
-                                        {sex || 'Select'}
+                                        {sex ? String(sex) : 'Select'}
                                     </Text>
                                     <Text style={styles.dropdownArrow}>▼</Text>
                                 </TouchableOpacity>
@@ -374,7 +288,7 @@ export default function ProfileSetup({ navigation }) {
                             </View>
                             <View style={styles.bmiDisplay}>
                                 <Text style={styles.bmiValueSmall}>--</Text>
-                                <Text style={styles.bmiValueSmall}>{calculateBMI()}</Text>
+                                <Text style={styles.bmiValueSmall}>{String(calculateBMI())}</Text>
                             </View>
                         </View>
                         <View style={styles.metricsFooter}>

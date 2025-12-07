@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 // Existing imports
 import WelcomeScreen from './motion/WelcomeScreen';
-import LoginScreen from './motion/login';
+import LoginScreen from './login';
 import SignUpScreen from './motion/SignUpScreen';
 import ProfileSetup from './ProfileSetup';
 import HomeScreen from './HomeScreen'; 

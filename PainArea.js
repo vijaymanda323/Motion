@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   PanResponder,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,6 +97,20 @@ export default function PainAreaScreen({ navigation }) {
   const [painLevel, setPainLevel] = useState(3);
   const [comfortLevel, setComfortLevel] = useState(7);
   const [isAnteriorView] = useState(true);
+  const [showHighPainModal, setShowHighPainModal] = useState(false);
+  const [hasShownModal, setHasShownModal] = useState(false);
+
+  // Show modal when pain level reaches 8 or higher
+  useEffect(() => {
+    const roundedPainLevel = Math.round(painLevel);
+    if (roundedPainLevel >= 8 && !hasShownModal) {
+      setShowHighPainModal(true);
+      setHasShownModal(true);
+    } else if (roundedPainLevel < 8) {
+      // Reset the flag when pain level goes below 8
+      setHasShownModal(false);
+    }
+  }, [painLevel, hasShownModal]);
 
   const handleSubmit = () => {
     // Save pain area data
@@ -111,6 +126,22 @@ export default function PainAreaScreen({ navigation }) {
       userName: userName || 'User',
       userEmail: userEmail || 'admin'
     });
+  };
+
+  const handleFindPhysio = () => {
+    setShowHighPainModal(false);
+    // TODO: Navigate to physio finder screen or open physio search
+    console.log('Find & Consult Physio pressed');
+    // You can add navigation here when you have a physio finder screen
+    // navigation.navigate('PhysioFinder');
+  };
+
+  const handleTryExercise = () => {
+    setShowHighPainModal(false);
+    // TODO: Navigate to gentle relief exercise screen
+    console.log('Try Gentle Relief Exercise pressed');
+    // You can add navigation here when you have an exercise screen
+    // navigation.navigate('GentleReliefExercise');
   };
 
   return (
@@ -217,6 +248,58 @@ export default function PainAreaScreen({ navigation }) {
           <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.arrowIcon} />
         </TouchableOpacity>
       </View>
+
+      {/* High Pain Level Modal */}
+      <Modal
+        visible={showHighPainModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowHighPainModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setShowHighPainModal(false)}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+
+            {/* Stethoscope Icon */}
+            <View style={styles.modalIconContainer}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons name="medical-outline" size={32} color="#FF3B30" />
+              </View>
+            </View>
+
+            {/* Title */}
+            <Text style={styles.modalTitle}>
+              Pain Level High ({Math.round(painLevel)}/10)
+            </Text>
+
+            {/* Message */}
+            <Text style={styles.modalMessage}>
+              You are reporting significant discomfort. We recommend professional consultation.
+            </Text>
+
+            {/* Action Buttons */}
+            <TouchableOpacity 
+              style={styles.modalRedButton}
+              onPress={handleFindPhysio}
+            >
+              <Text style={styles.modalRedButtonText}>Find & Consult Physio</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.modalGreenButton}
+              onPress={handleTryExercise}
+            >
+              <Text style={styles.modalGreenButtonText}>Try Gentle Relief Exercise</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -447,6 +530,89 @@ const styles = StyleSheet.create({
   },
   arrowIcon: {
     marginLeft: 4,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 4,
+    zIndex: 1,
+  },
+  modalIconContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  modalIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFE5F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalRedButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalRedButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalGreenButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#34C759',
+  },
+  modalGreenButtonText: {
+    color: '#34C759',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

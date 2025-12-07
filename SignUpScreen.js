@@ -69,7 +69,7 @@ export default function SignUpScreen({ navigation }) {
       
       const requestBody = {
         name: fullName,
-        email: email,
+        email: email.trim().toLowerCase(),
         password: password,
       };
       

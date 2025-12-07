@@ -9,6 +9,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+        // Don't log password in plain text
+        const logBody = { ...req.body };
+        if (logBody.password) {
+            logBody.password = '***HIDDEN***';
+        }
+        console.log('Request body:', JSON.stringify(logBody, null, 2));
+    }
+    next();
+});
+
 // MongoDB Connection URI (password @ is URL-encoded as %40)
 const MONGODB_URI = 'mongodb+srv://vijaymanda323_db_user:Vijay%403369@cluster0.xhsvyzy.mongodb.net/?appName=Cluster0';
 
@@ -40,6 +54,15 @@ app.use('/api', routes);
 // Basic route
 app.get('/', (req, res) => {
     res.json({ message: 'Backend server is running' });
+});
+
+// Test endpoint to verify login route is accessible
+app.get('/api/test', (req, res) => {
+    res.json({ 
+        message: 'API is working',
+        timestamp: new Date().toISOString(),
+        mongodbConnected: mongoose.connection.readyState === 1
+    });
 });
 
 // Start server

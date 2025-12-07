@@ -22,9 +22,12 @@ const createUser = async (req, res) => {
             return res.status(400).json({ message: 'Name, email, and password are required' });
         }
 
+        // Normalize email (trim and lowercase)
+        const normalizedEmail = email.trim().toLowerCase();
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (!emailRegex.test(normalizedEmail)) {
             return res.status(400).json({ message: 'Please enter a valid email address' });
         }
 
@@ -33,8 +36,8 @@ const createUser = async (req, res) => {
             return res.status(400).json({ message: 'Password must be at least 6 characters long' });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        // Check if user already exists (case-insensitive)
+        const existingUser = await User.findOne({ email: normalizedEmail });
         if (existingUser) {
             return res.status(400).json({ message: 'User with this email already exists' });
         }
@@ -44,10 +47,10 @@ const createUser = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         // Create user with hashed password
-        console.log('Creating user with email:', email);
+        console.log('Creating user with email:', normalizedEmail);
         const user = await User.create({ 
             name, 
-            email, 
+            email: normalizedEmail, 
             password: hashedPassword, 
             height, 
             weight, 
@@ -85,21 +88,81 @@ const createUser = async (req, res) => {
 }
 const loginUser = async (req, res) => {
     try {
+        console.log('\n=== LOGIN REQUEST RECEIVED ===');
+        console.log('Raw request body:', JSON.stringify(req.body));
+        console.log('Request headers:', JSON.stringify(req.headers));
+        console.log('MongoDB connection state:', mongoose.connection.readyState);
+        
         const { email, password } = req.body;
         
+        console.log('Extracted email (raw):', `"${email}"`);
+        console.log('Extracted password (raw):', password ? `"${password.substring(0, 2)}***"` : 'null');
+        console.log('Email type:', typeof email);
+        console.log('Password type:', typeof password);
+        console.log('Email length:', email?.length);
+        console.log('Password length:', password?.length);
+        
         if (!email || !password) {
+            console.log('❌ Missing email or password');
+            console.log('Email exists:', !!email);
+            console.log('Password exists:', !!password);
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        const user = await User.findOne({ email });
-        if (!user) {
+        // Normalize email (trim and lowercase) for consistent lookup
+        const normalizedEmail = email.trim().toLowerCase();
+        
+        console.log('Email after trim:', `"${email.trim()}"`);
+        console.log('Normalized email:', `"${normalizedEmail}"`);
+        console.log('Password provided (length):', password ? password.length : 0);
+        console.log('Password first 2 chars:', password ? password.substring(0, 2) : 'N/A');
+
+        // Check MongoDB connection
+        if (mongoose.connection.readyState !== 1) {
+            console.error('MongoDB not connected! Connection state:', mongoose.connection.readyState);
+            return res.status(503).json({ 
+                message: 'Database connection not available. Please check MongoDB Atlas IP whitelist settings.',
+                error: 'MongoDB not connected'
+            });
+        }
+
+        console.log('Searching for user with email:', `"${normalizedEmail}"`);
+        const user = await User.findOne({ email: normalizedEmail });
+        
+        if (user) {
+            console.log('✅ User found in database');
+            console.log('User email in DB:', `"${user.email}"`);
+            console.log('User name:', user.name);
+            console.log('Stored password hash exists:', !!user.password);
+            console.log('Stored password hash length:', user.password?.length || 0);
+        } else {
+            console.log('❌ User not found for email:', `"${normalizedEmail}"`);
+            // Also check if any users exist in database
+            const userCount = await User.countDocuments();
+            console.log('Total users in database:', userCount);
+            
+            // Try to find user with different case
+            const allUsers = await User.find({}, 'email').limit(5);
+            console.log('Sample emails in database:', allUsers.map(u => u.email));
+            
             return res.status(401).json({ message: 'Invalid email or password' });
         }
         
+        console.log('Comparing password...');
+        console.log('Input password:', password ? `"${password.substring(0, 2)}***"` : 'null');
+        console.log('Stored hash:', user.password ? `"${user.password.substring(0, 20)}..."` : 'null');
+        
         const isPasswordCorrect = await bcrypt.compare(password, user.password);
+        console.log('Password comparison result:', isPasswordCorrect);
+        
         if (!isPasswordCorrect) {
+            console.log('❌ Password incorrect');
+            console.log('Input password length:', password?.length);
+            console.log('Stored hash length:', user.password?.length);
             return res.status(401).json({ message: 'Invalid email or password' });
         }
+        
+        console.log('✅✅✅ Login successful for email:', normalizedEmail);
         
         // Update login streak
         const today = new Date();
@@ -181,7 +244,10 @@ const updateProfile = async (req, res) => {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        let user = await User.findOne({ email });
+        // Normalize email (trim and lowercase) for consistent lookup
+        const normalizedEmail = email.trim().toLowerCase();
+
+        let user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             // If user doesn't exist, create a new user with minimal data
             // This handles the case where user logs in but hasn't registered yet
@@ -190,13 +256,13 @@ const updateProfile = async (req, res) => {
             const hashedPassword = await bcrypt.hash(tempPassword, saltRounds);
             
             user = await User.create({
-                email: email,
+                email: normalizedEmail,
                 name: firstName || 'User',
                 password: hashedPassword, // Hashed temporary password
                 firstName: firstName,
                 surname: surname,
             });
-            console.log('Created new user for profile setup:', email);
+            console.log('Created new user for profile setup:', normalizedEmail);
         }
 
         // Update profile fields
@@ -257,7 +323,10 @@ const getUserProfile = async (req, res) => {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        const user = await User.findOne({ email });
+        // Normalize email (trim and lowercase) for consistent lookup
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }

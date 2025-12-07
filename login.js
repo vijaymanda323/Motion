@@ -31,54 +31,124 @@ export default function LoginScreen() {
   }, [prefillEmail]);
 
   const handleLogin = async () => {
+    // Validate inputs
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
+    // Normalize email
+    const normalizedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    if (!normalizedEmail || !trimmedPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
     setLoading(true);
-    
+
     try {
+      console.log('Login attempt for:', normalizedEmail);
+      console.log('API URL:', `${API_BASE_URL}/users/login`);
+      console.log('Platform:', Platform.OS);
+
+      // First, test if backend is reachable
+      try {
+        const testUrl = API_BASE_URL.replace('/api', '');
+        console.log('Testing backend connection at:', testUrl);
+        const testResponse = await fetch(testUrl, {
+          method: 'GET',
+          timeout: 5000,
+        });
+        console.log('Backend connection test:', testResponse.ok ? '✅ Success' : '❌ Failed');
+      } catch (testError) {
+        console.warn('Backend connection test failed:', testError.message);
+        // Continue anyway - the actual login will show the real error
+      }
+
       const response = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
-          email: email,
-          password: password,
+          email: normalizedEmail,
+          password: trimmedPassword,
         }),
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
-      if (response.ok) {
-        // Successful login - navigate to ProfileSetup
-        // The API automatically updates streak count on login
-        navigation.navigate('ProfileSetup', { 
-          user: {
-            email: email,
-            name: data.user?.name || 'User'
-          }
-        });
+      // Parse response
+      const responseText = await response.text();
+      let data;
+      
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          throw new Error('Invalid response from server');
+        }
       } else {
-        Alert.alert('Error', data.message || 'Invalid email or password');
+        data = { message: 'No response from server' };
+      }
+
+      console.log('Response data:', data);
+
+      // Check if login was successful
+      if (response.ok && response.status === 200 && data.token) {
+        console.log('Login successful!');
+        
+        // Check if user has completed profile (has firstName)
+        if (data.user?.firstName) {
+          // Profile exists, go to HomeScreen
+          navigation.navigate('HomeScreen', {
+            userName: data.user.firstName || data.user.name || 'User',
+            userEmail: normalizedEmail,
+          });
+        } else {
+          // No profile yet, go to ProfileSetup
+          navigation.navigate('ProfileSetup', {
+            user: {
+              email: normalizedEmail,
+              name: data.user?.name || data.user?.firstName || 'User',
+            },
+          });
+        }
+      } else {
+        // Login failed
+        const errorMessage = data.message || data.error || 'Invalid email or password';
+        console.error('Login failed:', errorMessage);
+        Alert.alert('Login Failed', errorMessage);
       }
     } catch (error) {
       console.error('Login error:', error);
-      let errorMessage = 'Network error. ';
+      console.error('Error message:', error.message);
+      console.error('Error name:', error.name);
       
-      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
-        errorMessage += 'Please check:\n\n';
+      let errorMessage = 'An error occurred. Please try again.';
+      let errorTitle = 'Error';
+
+      if (error.message.includes('Network request failed') ||
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('NetworkError')) {
+        errorTitle = 'Connection Error';
+        errorMessage = 'Cannot connect to backend server.\n\n';
+        errorMessage += 'Please check:\n';
         errorMessage += '1. Backend server is running (cd backend && npm start)\n';
-        errorMessage += '2. API URL is correct in config/api.js\n';
-        errorMessage += '3. If using physical device, update API URL with your computer\'s IP address\n';
-        errorMessage += '4. Both devices are on the same network';
-      } else {
-        errorMessage += error.message;
+        errorMessage += `2. API URL: ${API_BASE_URL}\n`;
+        errorMessage += '3. For Android Emulator: Backend must be on localhost:5000\n';
+        errorMessage += '4. For iOS Simulator: Backend must be on localhost:5000\n';
+        errorMessage += '5. For Physical Device: Use your computer IP (192.168.0.10)';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      
-      Alert.alert('Connection Error', errorMessage);
+
+      Alert.alert(errorTitle, errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,6 +180,7 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!loading}
               />
             </View>
 
@@ -125,10 +196,12 @@ export default function LoginScreen() {
                   secureTextEntry={!isPasswordVisible}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  editable={!loading}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
                   onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                  disabled={loading}
                 >
                   <Text style={styles.eyeText}>
                     {isPasswordVisible ? '👁️' : '👁️‍🗨️'}
@@ -137,12 +210,12 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.forgotButton}>
+            <TouchableOpacity style={styles.forgotButton} disabled={loading}>
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
+            <TouchableOpacity
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -162,6 +235,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.signupButton}
               onPress={() => navigation.navigate('SignUp')}
+              disabled={loading}
             >
               <Text style={styles.signupText}>
                 Don't have an account? <Text style={styles.signupLink}>Sign Up</Text>
@@ -293,4 +367,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

@@ -1,20 +1,26 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
 import API_BASE_URL from './config/api';
 
 // 🌟 CORRECTED COMPONENT: Now displays both label and value
-const ProfileRow = ({ label, value }) => (
-    <View style={styles.row}>
-        {/* Added Label Text */}
-        <Text style={styles.labelText}>{label}</Text> 
-        <Text style={styles.valueText}>{value}</Text>
-    </View>
-);
+const ProfileRow = ({ label, value }) => {
+    // Ensure value is always a string (never undefined/null)
+    const safeValue = value != null ? String(value) : '';
+    const safeLabel = label != null ? String(label) : '';
+    
+    return (
+        <View style={styles.row}>
+            {/* Added Label Text */}
+            <Text style={styles.labelText}>{safeLabel}</Text> 
+            <Text style={styles.valueText}>{safeValue}</Text>
+        </View>
+    );
+};
 
 export default function AboutYouScreen({ navigation }) {
     const route = useRoute();
@@ -38,8 +44,14 @@ export default function AboutYouScreen({ navigation }) {
     }, []);
 
     const fetchUserProfile = async () => {
-        // Try to get email from params or use default
-        const email = userEmailFromParams || 'admin'; // Fallback to 'admin' for now
+        // Get email from params (required)
+        const email = userEmailFromParams;
+        
+        if (!email) {
+            console.warn('No email provided to AboutYouScreen');
+            setLoading(false);
+            return;
+        }
         
         try {
             const response = await fetch(`${API_BASE_URL}/users/profile/${email}`);
@@ -83,6 +95,31 @@ export default function AboutYouScreen({ navigation }) {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: () => {
+                        // Navigate to Login screen and reset navigation stack
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Login' }],
+                        });
+                    },
+                },
+            ],
+            { cancelable: true }
+        );
     };
 
     return (
@@ -139,7 +176,7 @@ export default function AboutYouScreen({ navigation }) {
                 
                 {/* Added Description for Social Profile */}
                 <Text style={styles.description}>
-                   Your profile lets you **share movement progress and streaks** with friends for motivation and accountability, while controlling your privacy settings.
+                   Your profile lets you share movement progress and streaks with friends for motivation and accountability, while controlling your privacy settings.
                 </Text>
 
                 <View style={styles.card}>
@@ -171,6 +208,12 @@ export default function AboutYouScreen({ navigation }) {
                     {/* ID - Label passed correctly */}
                     <ProfileRow label="ID" value={profileData.id} />
                 </View>
+
+                {/* Logout Button */}
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Feather name="log-out" size={20} color="#ff4444" />
+                    <Text style={styles.logoutButtonText}>Logout</Text>
+                </TouchableOpacity>
                 
                 </ScrollView>
             )}
@@ -274,6 +317,25 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#ff4444',
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    logoutButtonText: {
+        color: '#ff4444',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 10,
     },
 });
 
