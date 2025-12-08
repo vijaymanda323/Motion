@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
@@ -10,7 +10,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from "react-native";
+import API_BASE_URL from "./config/api";
 
 const PAIN_ITEMS = [
   { emoji: "🦒", label: "Stiff Neck" },
@@ -69,6 +71,40 @@ export default function PainBingoScreen() {
   const userEmail = route.params?.userEmail || '';
   const [selectedCells, setSelectedCells] = useState([FREE_INDEX]);
   const [showModal, setShowModal] = useState(false);
+  const [streakCount, setStreakCount] = useState(0);
+  const [loadingStreak, setLoadingStreak] = useState(true);
+
+  useEffect(() => {
+    fetchUserStreak();
+  }, [userEmail]);
+
+  const fetchUserStreak = async () => {
+    if (!userEmail) {
+      setLoadingStreak(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/profile/${userEmail}`);
+      
+      if (!response.ok) {
+        console.warn('Failed to fetch user profile:', response.status);
+        setLoadingStreak(false);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.user) {
+        const streak = data.user.streakCount || 0;
+        setStreakCount(streak);
+      }
+    } catch (error) {
+      console.error('Error fetching user streak:', error);
+    } finally {
+      setLoadingStreak(false);
+    }
+  };
 
   const checkBingo = (cells) => {
     return LINES.some((line) => line.every((i) => cells.includes(i)));
@@ -163,7 +199,13 @@ export default function PainBingoScreen() {
         {/* STREAK CARD */}
         <View style={styles.streakCard}>
           <Text style={styles.sectionTitle}>🔥 Current Streak</Text>
-          <Text style={styles.streakNumber}>0 days</Text>
+          {loadingStreak ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.streakNumber}>
+              {streakCount} {streakCount === 1 ? 'day' : 'days'}
+            </Text>
+          )}
 
           <Text style={styles.sectionTitleSmall}>🏆 Total Bingos</Text>
           <Text style={styles.streakNumber}>0</Text>

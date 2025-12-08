@@ -1,14 +1,14 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
 import API_BASE_URL from './config/api';
 
 // 🌟 CORRECTED COMPONENT: Now displays both label and value
-const ProfileRow = ({ label, value }) => {
+const ProfileRow = ({ label, value, editable, editValue, onEditChange, placeholder }) => {
     // Ensure value is always a string (never undefined/null)
     const safeValue = value != null ? String(value) : '';
     const safeLabel = label != null ? String(label) : '';
@@ -17,7 +17,17 @@ const ProfileRow = ({ label, value }) => {
         <View style={styles.row}>
             {/* Added Label Text */}
             <Text style={styles.labelText}>{safeLabel}</Text> 
-            <Text style={styles.valueText}>{safeValue}</Text>
+            {editable ? (
+                <TextInput
+                    style={styles.editInput}
+                    value={editValue}
+                    onChangeText={onEditChange}
+                    placeholder={placeholder || safeValue}
+                    placeholderTextColor="#999"
+                />
+            ) : (
+                <Text style={styles.valueText}>{safeValue}</Text>
+            )}
         </View>
     );
 };
@@ -36,8 +46,23 @@ export default function AboutYouScreen({ navigation }) {
         bio: 'Share your fitness goals',
         accountCreated: '',
         id: '',
+        birthDate: '', // Store raw date for editing
+        heightValue: '', // Store numeric value
+        weightValue: '', // Store numeric value
     });
     const [loading, setLoading] = useState(true);
+    const [editingProfile, setEditingProfile] = useState(false);
+    const [editingSocial, setEditingSocial] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [editForm, setEditForm] = useState({
+        height: '',
+        weight: '',
+        birthDate: '',
+        sex: '',
+        displayName: '',
+        location: '',
+        bio: '',
+    });
 
     useEffect(() => {
         fetchUserProfile();
@@ -88,12 +113,137 @@ export default function AboutYouScreen({ navigation }) {
                     bio: 'Share your fitness goals',
                     accountCreated: accountCreatedFormatted,
                     id: user.id || user._id?.toString().substring(0, 6).toUpperCase() || '',
+                    birthDate: user.birthDate || '',
+                    heightValue: user.height || '',
+                    weightValue: user.weight || '',
+                });
+                
+                // Initialize edit form
+                setEditForm({
+                    height: user.height ? String(user.height) : '',
+                    weight: user.weight ? String(user.weight) : '',
+                    birthDate: user.birthDate ? new Date(user.birthDate).toISOString().split('T')[0] : '',
+                    sex: user.gender || '',
+                    displayName: user.firstName || user.name || '',
+                    location: 'Choose country',
+                    bio: 'Share your fitness goals',
                 });
             }
         } catch (error) {
             console.error('Error fetching user profile:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleEditProfile = () => {
+        setEditingProfile(true);
+    };
+
+    const handleEditSocial = () => {
+        setEditingSocial(true);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingProfile(false);
+        setEditingSocial(false);
+        // Reset form to original values
+        setEditForm({
+            height: profileData.heightValue ? String(profileData.heightValue) : '',
+            weight: profileData.weightValue ? String(profileData.weightValue) : '',
+            birthDate: profileData.birthDate ? new Date(profileData.birthDate).toISOString().split('T')[0] : '',
+            sex: profileData.sex || '',
+            displayName: profileData.displayName || '',
+            location: profileData.location || 'Choose country',
+            bio: profileData.bio || 'Share your fitness goals',
+        });
+    };
+
+    const handleSaveProfile = async () => {
+        if (!userEmailFromParams) {
+            Alert.alert('Error', 'User email not found');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const profileDataToSave = {
+                email: userEmailFromParams.trim().toLowerCase(),
+                firstName: editForm.displayName.trim(),
+                height: parseFloat(editForm.height) || 0,
+                weight: parseFloat(editForm.weight) || 0,
+                sex: editForm.sex,
+                birthDate: editForm.birthDate || undefined,
+            };
+
+            const response = await fetch(`${API_BASE_URL}/users/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(profileDataToSave),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update profile');
+            }
+
+            // Refresh profile data
+            await fetchUserProfile();
+            setEditingProfile(false);
+            Alert.alert('Success', 'Profile updated successfully');
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            Alert.alert('Error', error.message || 'Failed to update profile');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSaveSocial = async () => {
+        // For now, social profile fields (location, bio) might not be in backend
+        // We'll save displayName which is firstName in backend
+        if (!userEmailFromParams) {
+            Alert.alert('Error', 'User email not found');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const profileDataToSave = {
+                email: userEmailFromParams.trim().toLowerCase(),
+                firstName: editForm.displayName.trim(),
+            };
+
+            const response = await fetch(`${API_BASE_URL}/users/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(profileDataToSave),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update profile');
+            }
+
+            // Update local state for display
+            setProfileData(prev => ({
+                ...prev,
+                displayName: editForm.displayName,
+                location: editForm.location,
+                bio: editForm.bio,
+            }));
+
+            setEditingSocial(false);
+            Alert.alert('Success', 'Social profile updated successfully');
+        } catch (error) {
+            console.error('Error saving social profile:', error);
+            Alert.alert('Error', error.message || 'Failed to update social profile');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -140,9 +290,24 @@ export default function AboutYouScreen({ navigation }) {
                 {/* Profile Information Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Profile information</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.editButton}>Edit</Text>
-                    </TouchableOpacity>
+                    {!editingProfile ? (
+                        <TouchableOpacity onPress={handleEditProfile}>
+                            <Text style={styles.editButton}>Edit</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.editActions}>
+                            <TouchableOpacity onPress={handleCancelEdit} disabled={saving}>
+                                <Text style={styles.cancelButton}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleSaveProfile} disabled={saving}>
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#0A84FF" />
+                                ) : (
+                                    <Text style={styles.saveButton}>Save</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
 
                 <Text style={styles.description}>
@@ -150,28 +315,71 @@ export default function AboutYouScreen({ navigation }) {
                 </Text>
 
                 <View style={styles.card}>
-                    {/* Height - Label passed correctly */}
-                    <ProfileRow label="Height" value={profileData.height} />
+                    {/* Height */}
+                    <ProfileRow 
+                        label="Height" 
+                        value={profileData.height} 
+                        editable={editingProfile}
+                        editValue={editForm.height}
+                        onEditChange={(text) => setEditForm(prev => ({ ...prev, height: text }))}
+                        placeholder="Enter height in cm"
+                    />
                     <View style={styles.divider} />
                     
-                    {/* Weight - Label passed correctly */}
-                    <ProfileRow label="Weight" value={profileData.weight} />
+                    {/* Weight */}
+                    <ProfileRow 
+                        label="Weight" 
+                        value={profileData.weight} 
+                        editable={editingProfile}
+                        editValue={editForm.weight}
+                        onEditChange={(text) => setEditForm(prev => ({ ...prev, weight: text }))}
+                        placeholder="Enter weight in kg"
+                    />
                     <View style={styles.divider} />
 
-                    {/* Birthday - Label passed correctly */}
-                    <ProfileRow label="Birthday" value={profileData.birthday} />
+                    {/* Birthday */}
+                    <ProfileRow 
+                        label="Birthday" 
+                        value={profileData.birthday} 
+                        editable={editingProfile}
+                        editValue={editForm.birthDate}
+                        onEditChange={(text) => setEditForm(prev => ({ ...prev, birthDate: text }))}
+                        placeholder="YYYY-MM-DD"
+                    />
                     <View style={styles.divider} />
                     
-                    {/* Sex - Label passed correctly */}
-                    <ProfileRow label="Sex" value={profileData.sex} />
+                    {/* Sex */}
+                    <ProfileRow 
+                        label="Sex" 
+                        value={profileData.sex} 
+                        editable={editingProfile}
+                        editValue={editForm.sex}
+                        onEditChange={(text) => setEditForm(prev => ({ ...prev, sex: text }))}
+                        placeholder="Male, Female, Other"
+                    />
                 </View>
 
                 {/* Social Profile Section */}
                 <View style={[styles.sectionHeader, { marginTop: 20 }]}>
                     <Text style={styles.sectionTitle}>Social profile</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.editButton}>Edit</Text>
-                    </TouchableOpacity>
+                    {!editingSocial ? (
+                        <TouchableOpacity onPress={handleEditSocial}>
+                            <Text style={styles.editButton}>Edit</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.editActions}>
+                            <TouchableOpacity onPress={handleCancelEdit} disabled={saving}>
+                                <Text style={styles.cancelButton}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleSaveSocial} disabled={saving}>
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#0A84FF" />
+                                ) : (
+                                    <Text style={styles.saveButton}>Save</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
                 
                 {/* Added Description for Social Profile */}
@@ -180,16 +388,45 @@ export default function AboutYouScreen({ navigation }) {
                 </Text>
 
                 <View style={styles.card}>
-                    {/* Display Name - Label passed correctly */}
-                    <ProfileRow label="Display name" value={profileData.displayName} />
+                    {/* Display Name */}
+                    <ProfileRow 
+                        label="Display name" 
+                        value={profileData.displayName} 
+                        editable={editingSocial}
+                        editValue={editForm.displayName}
+                        onEditChange={(text) => setEditForm(prev => ({ ...prev, displayName: text }))}
+                        placeholder="Enter display name"
+                    />
                     <View style={styles.divider} />
                     
-                    {/* Location - Label passed correctly */}
-                    <ProfileRow label="Location" value={profileData.location} />
+                    {/* Location */}
+                    <ProfileRow 
+                        label="Location" 
+                        value={profileData.location} 
+                        editable={editingSocial}
+                        editValue={editForm.location}
+                        onEditChange={(text) => setEditForm(prev => ({ ...prev, location: text }))}
+                        placeholder="Enter location"
+                    />
                     <View style={styles.divider} />
 
-                    {/* Your bio - Label passed correctly */}
-                    <ProfileRow label="Your bio" value={profileData.bio} />
+                    {/* Your bio */}
+                    <View style={styles.row}>
+                        <Text style={styles.labelText}>Your bio</Text>
+                        {editingSocial ? (
+                            <TextInput
+                                style={[styles.editInput, styles.bioInput]}
+                                value={editForm.bio}
+                                onChangeText={(text) => setEditForm(prev => ({ ...prev, bio: text }))}
+                                placeholder="Share your fitness goals"
+                                placeholderTextColor="#999"
+                                multiline
+                                numberOfLines={3}
+                            />
+                        ) : (
+                            <Text style={styles.valueText}>{profileData.bio}</Text>
+                        )}
+                    </View>
                     <View style={styles.divider} />
                     
                     <TouchableOpacity style={styles.privacyButton}>
@@ -259,6 +496,35 @@ const styles = StyleSheet.create({
         color: '#0A84FF',
         fontSize: 16,
         fontWeight: '600',
+    },
+    editActions: {
+        flexDirection: 'row',
+        gap: 15,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        color: '#666',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    saveButton: {
+        color: '#0A84FF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    editInput: {
+        fontSize: 16,
+        color: '#333',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 10,
+        marginTop: 5,
+        backgroundColor: '#f9f9f9',
+    },
+    bioInput: {
+        minHeight: 60,
+        textAlignVertical: 'top',
     },
     // 🌟 Adjusted description style for better flow in the Social Profile section
     description: {
