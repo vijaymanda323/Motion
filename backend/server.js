@@ -65,6 +65,38 @@ app.get('/api/test', (req, res) => {
     });
 });
 
+// Health check endpoint with available routes
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok',
+        message: 'Backend server is running',
+        timestamp: new Date().toISOString(),
+        mongodbConnected: mongoose.connection.readyState === 1,
+        availableEndpoints: {
+            user: {
+                register: 'POST /api/users/register',
+                login: 'POST /api/users/login',
+                updateProfile: 'PUT /api/users/profile',
+                getProfile: 'GET /api/users/profile/:email'
+            },
+            video: {
+                uploadFile: 'POST /api/videos/upload-file (multipart/form-data)',
+                upload: 'POST /api/videos/upload (base64 JSON)',
+                getUserVideos: 'GET /api/videos/user/:email',
+                getVideo: 'GET /api/videos/:videoId',
+                streamVideo: 'GET /api/videos/:videoId/stream',
+                getThumbnail: 'GET /api/videos/:videoId/thumbnail',
+                updateVideo: 'PUT /api/videos/:videoId',
+                deleteVideo: 'DELETE /api/videos/:videoId'
+            },
+            test: {
+                health: 'GET /api/health',
+                test: 'GET /api/test'
+            }
+        }
+    });
+});
+
 // Start server
 const PORT = process.env.PORT || 5000;
 // Listen on all network interfaces (0.0.0.0) to allow access from physical devices
