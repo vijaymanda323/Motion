@@ -25,11 +25,9 @@ router.put('/users/profile', updateProfile);
 router.get('/users/profile/:email', getUserProfile);
 
 // Video routes
-// Upload video using multipart/form-data (for Postman file uploads)
-router.post('/videos/upload-file', upload.fields([
-    { name: 'video', maxCount: 1 },
-    { name: 'thumbnail', maxCount: 1 }
-]), uploadVideoFile);
+// Upload video using multipart/form-data (for Postman file uploads and React Native)
+// Using single() for better React Native compatibility
+router.post('/videos/upload-file', upload.single('video'), uploadVideoFile);
 // Upload video using base64 (original endpoint)
 router.post('/videos/upload', uploadVideo);
 // Get all public videos (shared across all users)

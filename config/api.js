@@ -9,10 +9,10 @@ import { Platform } from 'react-native';
 // - Mac/Linux: Open Terminal and type 'ifconfig' or 'ip addr', look for inet address
 
 // Set to true to use production URL even in development mode (useful for testing deployed backend)
-const USE_PRODUCTION_URL = true; // Change to false to use local development server
+const USE_PRODUCTION_URL = false; // Change to false to use local development server
 
-const YOUR_COMPUTER_IP = '192.168.29.2'; // Your computer's IP address (updated to match actual IP)
-const PRODUCTION_URL = 'https://motion-physio-apk-1.onrender.com/api';
+const YOUR_COMPUTER_IP = '192.168.0.18'; // Your computer's IP address (updated to match actual IP)
+const PRODUCTION_URL = 'https://motion-video-1.onrender.com/api';
 
 let API_BASE_URL;
 

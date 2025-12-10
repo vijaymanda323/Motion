@@ -7,18 +7,37 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
 
-// Request logging middleware
+// Request logging middleware - must be before body parsers
 app.use((req, res, next) => {
+    // Skip body logging for multipart/form-data (file uploads)
+    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+        console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path} (multipart/form-data - file upload)`);
+        next();
+        return;
+    }
+    
     console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-        // Don't log password in plain text
-        const logBody = { ...req.body };
-        if (logBody.password) {
-            logBody.password = '***HIDDEN***';
+    next();
+});
+
+// Only parse JSON for non-file routes
+// express.json() only parses application/json, so it won't interfere with multipart/form-data
+app.use(express.json({ limit: '50mb' }));
+// Important: Don't use express.urlencoded() for file uploads - multer handles multipart/form-data
+
+// Additional logging for non-file requests
+app.use((req, res, next) => {
+    // Only log body for non-multipart requests
+    if (!req.headers['content-type'] || !req.headers['content-type'].includes('multipart/form-data')) {
+        if (req.body && Object.keys(req.body).length > 0) {
+            // Don't log password in plain text
+            const logBody = { ...req.body };
+            if (logBody.password) {
+                logBody.password = '***HIDDEN***';
+            }
+            console.log('Request body:', JSON.stringify(logBody, null, 2));
         }
-        console.log('Request body:', JSON.stringify(logBody, null, 2));
     }
     next();
 });

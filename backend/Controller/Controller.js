@@ -374,17 +374,30 @@ const upload = multer({
         fileSize: 500 * 1024 * 1024 // 500MB limit
     },
     fileFilter: (req, file, cb) => {
+        console.log('Multer fileFilter called:', {
+            fieldname: file.fieldname,
+            originalname: file.originalname,
+            mimetype: file.mimetype
+        });
+        
         // Accept video files for 'video' field
         if (file.fieldname === 'video') {
-            if (file.mimetype.startsWith('video/')) {
+            // Be more lenient with mimetype - React Native might not send it correctly
+            if (file.mimetype && file.mimetype.startsWith('video/')) {
+                console.log('✅ Video file accepted by fileFilter');
+                cb(null, true);
+            } else if (!file.mimetype || file.mimetype === 'application/octet-stream') {
+                // Accept if no mimetype or generic type (React Native sometimes sends this)
+                console.log('✅ File accepted (no/unknown mimetype, assuming video)');
                 cb(null, true);
             } else {
+                console.log('❌ File rejected - not a video mimetype:', file.mimetype);
                 cb(new Error('Only video files are allowed for video field'), false);
             }
         } 
         // Accept image files for 'thumbnail' field
         else if (file.fieldname === 'thumbnail') {
-            if (file.mimetype.startsWith('image/')) {
+            if (file.mimetype && file.mimetype.startsWith('image/')) {
                 cb(null, true);
             } else {
                 cb(new Error('Only image files are allowed for thumbnail field'), false);
@@ -398,6 +411,34 @@ const upload = multer({
 // Upload video using multipart/form-data (for Postman file uploads)
 const uploadVideoFile = async (req, res) => {
     try {
+        // Debug logging
+        console.log('\n=== VIDEO UPLOAD REQUEST ===');
+        console.log('Method:', req.method);
+        console.log('Content-Type:', req.headers['content-type']);
+        console.log('Is multipart/form-data?', req.headers['content-type']?.includes('multipart/form-data'));
+        console.log('req.file:', req.file ? {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size
+        } : null);
+        console.log('req.files:', req.files);
+        console.log('req.body:', req.body);
+        console.log('Request keys:', {
+            file: !!req.file,
+            files: !!req.files,
+            bodyKeys: Object.keys(req.body || {})
+        });
+        
+        // Check if Content-Type is correct
+        if (!req.headers['content-type'] || !req.headers['content-type'].includes('multipart/form-data')) {
+            console.error('❌ ERROR: Request is NOT multipart/form-data!');
+            console.error('Content-Type received:', req.headers['content-type']);
+            return res.status(400).json({ 
+                message: 'Request must be multipart/form-data. Content-Type: ' + (req.headers['content-type'] || 'missing')
+            });
+        }
+        
         // Check MongoDB connection
         if (mongoose.connection.readyState !== 1) {
             return res.status(503).json({ 
@@ -407,11 +448,26 @@ const uploadVideoFile = async (req, res) => {
         }
 
         // Check if file was uploaded
+        // Using upload.single() so file is in req.file
         if (!req.file) {
+            console.log('❌ No file received!');
+            console.log('req.file:', req.file);
+            console.log('req.files:', req.files);
+            console.log('Request headers:', JSON.stringify(req.headers, null, 2));
+            console.log('Request body:', JSON.stringify(req.body, null, 2));
             return res.status(400).json({ 
                 message: 'Video file is required. Please upload a video file using multipart/form-data.' 
             });
         }
+        
+        console.log('✅ File received:', {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size
+        });
+        
+        const videoFile = req.file;
 
         const { 
             title, 
@@ -439,10 +495,10 @@ const uploadVideoFile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const videoBuffer = req.file.buffer;
-        const fileName = req.file.originalname || `video_${Date.now()}.mp4`;
-        const contentType = req.file.mimetype || 'video/mp4';
-        const fileSize = req.file.size;
+        const videoBuffer = videoFile.buffer;
+        const fileName = videoFile.originalname || `video_${Date.now()}.mp4`;
+        const contentType = videoFile.mimetype || 'video/mp4';
+        const fileSize = videoFile.size;
 
         // Initialize GridFS bucket
         const db = mongoose.connection.db;
@@ -471,33 +527,12 @@ const uploadVideoFile = async (req, res) => {
             videoUploadStream.end();
         });
 
-        // Handle thumbnail if provided as a separate file
+        // Handle thumbnail if provided (would need to be sent as base64 in body or separate request)
         let gridFSThumbnailId = null;
         let thumbnailContentType = 'image/jpeg';
         
-        if (req.files && req.files.thumbnail && req.files.thumbnail.length > 0) {
-            const thumbnailBuffer = req.files.thumbnail[0].buffer;
-            thumbnailContentType = req.files.thumbnail[0].mimetype || 'image/jpeg';
-            
-            const thumbnailBucket = new GridFSBucket(db, { bucketName: 'thumbnails' });
-            const thumbnailUploadStream = thumbnailBucket.openUploadStream(`${fileName}_thumb`, {
-                contentType: thumbnailContentType,
-                metadata: {
-                    videoId: gridFSVideoId.toString(),
-                    userEmail: normalizedEmail
-                }
-            });
-
-            await new Promise((resolve, reject) => {
-                thumbnailUploadStream.on('finish', () => {
-                    gridFSThumbnailId = thumbnailUploadStream.id;
-                    resolve();
-                });
-                thumbnailUploadStream.on('error', reject);
-                thumbnailUploadStream.write(thumbnailBuffer);
-                thumbnailUploadStream.end();
-            });
-        }
+        // Note: Thumbnail handling removed for now since we're using upload.single()
+        // Can be added later if needed via base64 in request body
 
         // Parse tags if provided as string
         let parsedTags = [];
