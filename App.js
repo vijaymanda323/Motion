@@ -13,7 +13,8 @@ import HomeScreen from './HomeScreen';
 import PainBingoScreen from './PainBingoScreen'; 
 import QuickReliefScreen from './QuickReliefScreen'; 
 import AboutYouScreen from './AboutYouScreen';
-import PainAreaScreen from './PainArea'; 
+import PainAreaScreen from './PainArea';
+import PhysioConsult from './PhysioConsult'; 
 
 const Stack = createNativeStackNavigator();
 
@@ -40,6 +41,7 @@ export default function App() {
         
         <Stack.Screen name="AboutYou" component={AboutYouScreen} />
         <Stack.Screen name="PainArea" component={PainAreaScreen} />
+        <Stack.Screen name="PhysioConsult" component={PhysioConsult} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -130,18 +130,21 @@ export default function PainAreaScreen({ navigation }) {
 
   const handleFindPhysio = () => {
     setShowHighPainModal(false);
-    // TODO: Navigate to physio finder screen or open physio search
-    console.log('Find & Consult Physio pressed');
-    // You can add navigation here when you have a physio finder screen
-    // navigation.navigate('PhysioFinder');
+    // Navigate to PhysioConsult screen with relevant pain data
+    navigation.navigate('PhysioConsult', {
+      userName: userName,
+      userEmail: userEmail,
+      painLevel: Math.round(painLevel),
+      comfortLevel: Math.round(comfortLevel),
+      selectedCount: selectedCount,
+    });
   };
 
   const handleTryExercise = () => {
     setShowHighPainModal(false);
-    // TODO: Navigate to gentle relief exercise screen
-    console.log('Try Gentle Relief Exercise pressed');
-    // You can add navigation here when you have an exercise screen
-    // navigation.navigate('GentleReliefExercise');
+    // TODO: Navigate to quick relief screen
+    navigation.navigate('QuickRelief');
+   
   };
 
   return (

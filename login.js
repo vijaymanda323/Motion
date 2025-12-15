@@ -53,34 +53,46 @@ export default function LoginScreen() {
       console.log('API URL:', `${API_BASE_URL}/users/login`);
       console.log('Platform:', Platform.OS);
 
-      // First, test if backend is reachable
+      // First, test if backend is reachable (optional - don't block login if it fails)
       try {
         const testUrl = API_BASE_URL.replace('/api', '');
         console.log('Testing backend connection at:', testUrl);
         
         // Use AbortController for timeout (fetch doesn't support timeout option)
+        // Increased timeout to 8 seconds for slower networks
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         
         const testResponse = await fetch(testUrl, {
           method: 'GET',
           signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+          },
         });
         
         clearTimeout(timeoutId);
-        console.log('Backend connection test:', testResponse.ok ? '✅ Success' : '❌ Failed');
+        if (testResponse.ok) {
+          console.log('Backend connection test: ✅ Success');
+        } else {
+          console.warn('Backend connection test: ⚠️ Server responded with status', testResponse.status);
+        }
       } catch (testError) {
+        // Don't block login attempt - just log the warning
         if (testError.name === 'AbortError') {
-          console.warn('Backend connection test failed: Request timeout (5s)');
+          console.warn('Backend connection test failed: Request timeout (8s)');
+          console.warn('⚠️ Connection test timed out, but continuing with login attempt...');
         } else {
           console.warn('Backend connection test failed:', testError.message);
+          console.warn('⚠️ Connection test failed, but continuing with login attempt...');
         }
         // Continue anyway - the actual login will show the real error
       }
 
       // Create AbortController for login request timeout
+      // Increased timeout to 20 seconds for slower networks or initial connection
       const loginController = new AbortController();
-      const loginTimeoutId = setTimeout(() => loginController.abort(), 15000); // 15 second timeout
+      const loginTimeoutId = setTimeout(() => loginController.abort(), 20000); // 20 second timeout
       
       const response = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
@@ -153,12 +165,18 @@ export default function LoginScreen() {
 
       if (error.name === 'AbortError') {
         errorTitle = 'Request Timeout';
-        errorMessage = 'The request took too long to complete.\n\n';
-        errorMessage += 'Please check:\n';
-        errorMessage += '1. Backend server is running (cd backend && npm start)\n';
-        errorMessage += `2. API URL: ${API_BASE_URL}\n`;
-        errorMessage += '3. Your device and computer are on the same network\n';
-        errorMessage += '4. Firewall allows connections on port 5000';
+        errorMessage = 'The request took too long to complete (20s timeout).\n\n';
+        errorMessage += 'Possible causes:\n';
+        errorMessage += '1. Backend server is not running\n';
+        errorMessage += '   → Start it: cd backend && npm start\n';
+        errorMessage += `2. Incorrect API URL: ${API_BASE_URL}\n`;
+        errorMessage += '   → Check your IP address in config/api.js\n';
+        errorMessage += '3. Device and computer are on different networks\n';
+        errorMessage += '   → Ensure both are on the same WiFi\n';
+        errorMessage += '4. Firewall blocking port 5000\n';
+        errorMessage += '   → Allow port 5000 in Windows Firewall\n';
+        errorMessage += '5. Slow network connection\n';
+        errorMessage += '   → Try again or check your internet connection';
       } else if (error.message.includes('Network request failed') ||
           error.message.includes('Failed to fetch') ||
           error.message.includes('NetworkError')) {

@@ -5,6 +5,7 @@ import {
   View,
   TouchableOpacity,
   SafeAreaView,
+  ImageBackground,
 } from 'react-native';
 
 export default function WelcomeScreen({ navigation }) {
@@ -18,37 +19,46 @@ export default function WelcomeScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome to</Text>
-          <Text style={styles.brandLine}>MOTION</Text>
-          <Text style={styles.brandLine}>PHYSIO</Text>
+    <ImageBackground
+      source={require('./assets/images/logo1.jpg')}
+      style={styles.background}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.welcomeText}>Welcome to</Text>
+            <Text style={styles.brandLine}>MOTION</Text>
+            <Text style={styles.brandLine}>PHYSIO</Text>
+          </View>
+
+          <View style={styles.heroPlaceholder}>
+            {/* You can add overlay illustration or leave transparent */}
+          </View>
+
+          <View style={styles.buttons}>
+            <TouchableOpacity style={styles.primaryButton} onPress={handleGetStarted}>
+              <Text style={styles.primaryButtonText}>Get Started</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleGetStarted}>
+              <Text style={styles.linkText}>Sign In</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleLearnMore}>
+              <Text style={styles.linkText}>Learn More</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <View style={styles.heroPlaceholder}>
-          {/* In your real app, replace this with the hero image you uploaded */}
-        </View>
-
-        <View style={styles.buttons}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleGetStarted}>
-            <Text style={styles.primaryButtonText}>Get Started</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleGetStarted}>
-            <Text style={styles.linkText}>Sign In</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleLearnMore}>
-            <Text style={styles.linkText}>Learn More</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#021A3A',

@@ -11,11 +11,15 @@ export const testServerConnection = async () => {
     console.log('Testing connection to:', baseUrl);
     
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    // Increased timeout to 8 seconds for slower networks
+    const timeout = setTimeout(() => controller.abort(), 8000);
     
     const response = await fetch(baseUrl, {
       method: 'GET',
       signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+      },
     });
     
     clearTimeout(timeout);

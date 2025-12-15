@@ -45,3 +45,4 @@ If you get "port 5000 already in use":
 - Check Windows Firewall settings
 - Verify IP address in `config/api.js` matches your computer's IP
 
+

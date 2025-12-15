@@ -208,7 +208,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: "#eef2ff" 
+    backgroundColor: "#ffffff" 
   },
   scrollContent: {
     paddingTop: 40, 
