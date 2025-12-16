@@ -7,14 +7,14 @@ import WelcomeScreen from './WelcomeScreen';
 import LoginScreen from './login';
 import SignUpScreen from './SignUpScreen';
 import ProfileSetup from './ProfileSetup';
-import HomeScreen from './HomeScreen'; 
+import HomeScreen from './HomeScreen';
+import PhysioConsult from './PhysioConsult';
 
 // New imports
 import PainBingoScreen from './PainBingoScreen'; 
 import QuickReliefScreen from './QuickReliefScreen'; 
 import AboutYouScreen from './AboutYouScreen';
-import PainAreaScreen from './PainArea';
-import PhysioConsult from './PhysioConsult'; 
+import PainAreaScreen from './PainArea'; 
 
 const Stack = createNativeStackNavigator();
 

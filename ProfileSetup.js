@@ -124,7 +124,8 @@ export default function ProfileSetup({ navigation }) {
                 firstName: firstName.trim(),
                 surname: surname.trim(),
                 sex: sex,
-                birthDate: birthDate,
+                // Send ISO date string so backend can safely convert to Date
+                birthDate: dateObject.toISOString(),
                 height: parseFloat(height) || 0,
                 weight: parseFloat(weight) || 0,
                 heartSurgery: heartSurgery,
@@ -135,7 +136,8 @@ export default function ProfileSetup({ navigation }) {
                 fracturesComment: fracturesComment.trim() || '',
             };
 
-            console.log('Saving profile data:', profileData);
+            console.log('Saving profile data to:', `${API_BASE_URL}/users/profile`);
+            console.log('Profile payload:', JSON.stringify(profileData, null, 2));
 
             // Save to backend
             const response = await fetch(`${API_BASE_URL}/users/profile`, {
@@ -148,6 +150,8 @@ export default function ProfileSetup({ navigation }) {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('Profile save failed. Status:', response.status);
+                console.error('Raw error response:', errorText);
                 let errorMessage = 'Failed to save profile';
                 try {
                     const errorData = JSON.parse(errorText);
